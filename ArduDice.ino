@@ -6,6 +6,10 @@
 #define SCREEN_HEIGHT 32
 #define DICE_LIMIT 5
 
+#define LINE_1 0
+#define LINE_2 9
+#define LINE_3 24
+
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 const int button1 = 4;
@@ -123,10 +127,6 @@ void handleButtons() {
 }
 
 void rollDice() {
-  display.setTextSize(1);
-  display.setCursor(0, 0);
-  display.println("Roll dice");
-
   while (currentDie < selectedDiceCount) {
     // Animation for remaining dice
     display.clearDisplay();
@@ -145,7 +145,7 @@ void rollDice() {
     int xPos = 0;
 
     for (int i = 0; i < selectedDiceCount; i++) {
-      display.setCursor(xPos, 12);
+      display.setCursor(xPos, LINE_2);
 
       if (results[i] != -1) {
         // Show fixed result for already rolled dice
@@ -160,7 +160,7 @@ void rollDice() {
 
       // Add separator after all but the last dice
       if (i < selectedDiceCount - 1) {
-        display.setCursor(xPos, 12);
+        display.setCursor(xPos, LINE_2);
         display.print("|");
         xPos += (results[i] < 10 ? 12 : 18);
       }
@@ -169,7 +169,7 @@ void rollDice() {
     // Show running total
     if (currentDie > 0) {
       display.setTextSize(1);
-      display.setCursor(0, 25);
+      display.setCursor(0, LINE_3);
       display.print("Running total: ");
       display.print(total);
     }
@@ -203,7 +203,7 @@ void showResults(int total, int results[]) {
   while (showResults) {
     display.clearDisplay();
     display.setTextSize(1);
-    display.setCursor(0, 0);
+    display.setCursor(0, LINE_1);
     display.print(selectedDiceCount);
     display.print("d");
     display.print(DICE_TYPES[selectedDiceTypeIndex]);
@@ -217,12 +217,12 @@ void showResults(int total, int results[]) {
     int finalXPos = 0;
 
     for (int i = 0; i < selectedDiceCount; i++) {
-      display.setCursor(finalXPos, 12);
+      display.setCursor(finalXPos, LINE_2);
       display.print(results[i]);
       finalXPos += (results[i] < 10 ? 12 : 18);
 
       if (i < selectedDiceCount - 1) {
-        display.setCursor(finalXPos, 12);
+        display.setCursor(finalXPos, LINE_2);
         display.print("|");
         finalXPos += (results[i] < 10 ? 12 : 18);
       }
