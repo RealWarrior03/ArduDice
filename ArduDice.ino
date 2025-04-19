@@ -1,24 +1,26 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+//#include <ezButton.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 32
 #define DICE_LIMIT 5
 
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+#define CLK_PIN 2
+#define DT_PIN 3
+#define SW_PIN 4
+int CLK_state;
+int prev_CLK_state;
+//ezButton button(SW_PIN);
+bool prevButtonPressed = HIGH;
+volatile unsigned long last_time;
+
 #define LINE_1 0
 #define LINE_2 9
 #define LINE_3 24
-
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
-
-const int button1 = 4;
-const int button2 = 3;
-const int button3 = 2;
-
-bool lastButton1State = HIGH;
-bool lastButton2State = HIGH;
-bool lastButton3State = HIGH;
 
 enum diceOS {
   LAUNCH,
@@ -36,21 +38,31 @@ const int DICE_TYPES[] = {4, 6, 8, 10, 12, 20};
 const int NUM_DICE_TYPES = 6;
 
 diceOS currentState = LAUNCH;
-int selectedDiceTypeIndex = 0;
-int selectedDiceCount = 1;
+volatile int selectedDiceTypeIndex = 0;
+int previousDiceTypeIndex = 0;
+volatile int selectedDiceCount = 1;
+int previousDiceCount = 1;
 
 
 void setup() {
-  pinMode(button1, INPUT_PULLUP);
-  pinMode(button2, INPUT_PULLUP);
-  pinMode(button3, INPUT_PULLUP);
-
-  Serial.begin(115200);
+  //Serial.begin(115200);
+  Serial.begin(9600);
 
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("SSD1306 allocation failed"));
     for(;;);
   }
+
+  // configure encoder pins as inputs
+  pinMode(CLK_PIN, INPUT);
+  pinMode(DT_PIN, INPUT);
+  pinMode(SW_PIN, INPUT_PULLUP);
+  //button.setDebounceTime(50);  // set debounce time to 50 milliseconds
+  //attachInterrupt(digitalPinToInterrupt(CLK_PIN), updateEncoder, RISING);
+  attachInterrupt(digitalPinToInterrupt(CLK_PIN), updateEncoder, CHANGE);
+  //attachInterrupt(digitalPinToInterrupt(DT_PIN), updateEncoder, CHANGE);
+  // read the initial state of the rotary encoder's CLK pin
+  prev_CLK_state = digitalRead(CLK_PIN);
 
   randomSeed(analogRead(0));
 
@@ -60,48 +72,15 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
+  //button.loop();
   handleButtons();
   updateDisplay();
-  delay(50);
 }
 
 void handleButtons() {
-  bool button1State = digitalRead(button1);
-  bool button2State = digitalRead(button2);
-  bool button3State = digitalRead(button3);
+  bool buttonPressed = digitalRead(SW_PIN);
 
-  // Button 1: Up/Increase
-  if (button1State == LOW && lastButton1State == HIGH) {
-    switch (currentState) {
-      case LAUNCH:
-        currentState = DICE_TYPE;
-        break;
-      case DICE_TYPE:
-        selectedDiceTypeIndex = (selectedDiceTypeIndex + 1) % NUM_DICE_TYPES;
-        break;
-      case DICE_COUNT:
-        selectedDiceCount = min(selectedDiceCount + 1, DICE_LIMIT);
-        break;
-    }
-  }
-
-  // Button 2: Down/Decrease
-  if (button2State == LOW && lastButton2State == HIGH) {
-    switch (currentState) {
-      case LAUNCH:
-        currentState = DICE_TYPE;
-        break;
-      case DICE_TYPE:
-        selectedDiceTypeIndex = (selectedDiceTypeIndex - 1 + NUM_DICE_TYPES) % NUM_DICE_TYPES;
-        break;
-      case DICE_COUNT:
-        selectedDiceCount = max(selectedDiceCount - 1, 1);
-        break;
-    }
-  }
-
-  // Button 3: Confirm/Roll
-  if (button3State == LOW && lastButton3State == HIGH) {
+  if (buttonPressed == LOW && prevButtonPressed == HIGH) {
     switch (currentState) {
       case LAUNCH:
         currentState = DICE_TYPE;
@@ -121,9 +100,7 @@ void handleButtons() {
     }
   }
 
-  lastButton1State = button1State;
-  lastButton2State = button2State;
-  lastButton3State = button3State;
+  prevButtonPressed = buttonPressed;
 }
 
 void rollDice() {
@@ -177,9 +154,8 @@ void rollDice() {
     display.display();
     //delay(100); //Animation speed
 
-    // Check for button press to fix current die
-    bool button3State = digitalRead(button3);
-    if (button3State == LOW && lastButton3State == HIGH) {
+    bool buttonPressed = digitalRead(SW_PIN);
+    if (buttonPressed == LOW && prevButtonPressed == HIGH) {
       // Fix the current die result
       results[currentDie] = random(1, DICE_TYPES[selectedDiceTypeIndex] + 1);
       total += results[currentDie];
@@ -194,7 +170,7 @@ void rollDice() {
 
       delay(200);
     }
-    lastButton3State = button3State;
+    prevButtonPressed = buttonPressed;
   }
 }
 
@@ -230,8 +206,8 @@ void showResults(int total, int results[]) {
 
     display.display();
 
-    bool button3State = digitalRead(button3);
-    if (button3State == LOW && lastButton3State == HIGH) {
+    bool buttonPressed = digitalRead(SW_PIN);
+    if (buttonPressed == LOW && prevButtonPressed == HIGH) {
       total = 0;
       for (int i = 0; i < DICE_LIMIT; i++) {
         results[i] = -1;
@@ -242,7 +218,7 @@ void showResults(int total, int results[]) {
       delay(200);
       break;
     }
-    lastButton3State = button3State;
+    prevButtonPressed = buttonPressed;
   }
 }
 
@@ -301,4 +277,33 @@ void launchScreen() {
   display.setTextSize(1);
   display.setCursor(0, 24);
   display.println("Press any button!");
+}
+
+void updateEncoder() {
+  if ((millis() - last_time) < 50)  // debounce time is 50ms
+    return;
+
+  if (digitalRead(DT_PIN) == LOW) {
+    // the encoder is rotating in counter-clockwise direction => decrease the counter
+    switch (currentState) {
+      case DICE_TYPE:
+        selectedDiceTypeIndex = (selectedDiceTypeIndex - 1 + NUM_DICE_TYPES) % NUM_DICE_TYPES;
+        break;
+      case DICE_COUNT:
+        selectedDiceCount = max(selectedDiceCount - 1, 1);
+        break;
+    }
+  } else {
+    // the encoder is rotating in clockwise direction => increase the counter
+    switch (currentState) {
+      case DICE_TYPE:
+        selectedDiceTypeIndex = (selectedDiceTypeIndex + 1) % NUM_DICE_TYPES;
+        break;
+      case DICE_COUNT:
+        selectedDiceCount = min(selectedDiceCount + 1, DICE_LIMIT);
+        break;
+    }
+  }
+
+  last_time = millis();
 }
