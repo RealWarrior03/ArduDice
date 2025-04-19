@@ -1,7 +1,6 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
-//#include <ezButton.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 32
@@ -14,7 +13,6 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 #define SW_PIN 4
 int CLK_state;
 int prev_CLK_state;
-//ezButton button(SW_PIN);
 bool prevButtonPressed = HIGH;
 volatile unsigned long last_time;
 
@@ -45,8 +43,8 @@ int previousDiceCount = 1;
 
 
 void setup() {
-  //Serial.begin(115200);
-  Serial.begin(9600);
+  Serial.begin(115200);
+  //Serial.begin(9600);
 
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("SSD1306 allocation failed"));
@@ -57,10 +55,7 @@ void setup() {
   pinMode(CLK_PIN, INPUT);
   pinMode(DT_PIN, INPUT);
   pinMode(SW_PIN, INPUT_PULLUP);
-  //button.setDebounceTime(50);  // set debounce time to 50 milliseconds
-  //attachInterrupt(digitalPinToInterrupt(CLK_PIN), updateEncoder, RISING);
   attachInterrupt(digitalPinToInterrupt(CLK_PIN), updateEncoder, CHANGE);
-  //attachInterrupt(digitalPinToInterrupt(DT_PIN), updateEncoder, CHANGE);
   // read the initial state of the rotary encoder's CLK pin
   prev_CLK_state = digitalRead(CLK_PIN);
 
@@ -72,7 +67,6 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  //button.loop();
   handleButtons();
   updateDisplay();
 }
@@ -127,19 +121,19 @@ void rollDice() {
       if (results[i] != -1) {
         // Show fixed result for already rolled dice
         display.print(results[i]);
-        xPos += (results[i] < 10 ? 12 : 18);
+        xPos += (results[i] < 10 ? 12 : 24);
       } else {
         // Show animation for unrolled dice
         int animResult = random(1, DICE_TYPES[selectedDiceTypeIndex] + 1);
         display.print(animResult);
-        xPos += (animResult < 10 ? 12 : 18);
+        xPos += (animResult < 10 ? 12 : 24);
       }
 
       // Add separator after all but the last dice
       if (i < selectedDiceCount - 1) {
         display.setCursor(xPos, LINE_2);
         display.print("|");
-        xPos += (results[i] < 10 ? 12 : 18);
+        xPos += 12;
       }
     }
 
@@ -195,12 +189,12 @@ void showResults(int total, int results[]) {
     for (int i = 0; i < selectedDiceCount; i++) {
       display.setCursor(finalXPos, LINE_2);
       display.print(results[i]);
-      finalXPos += (results[i] < 10 ? 12 : 18);
+      finalXPos += (results[i] < 10 ? 12 : 24);
 
       if (i < selectedDiceCount - 1) {
         display.setCursor(finalXPos, LINE_2);
         display.print("|");
-        finalXPos += (results[i] < 10 ? 12 : 18);
+        finalXPos += 12;
       }
     }
 
